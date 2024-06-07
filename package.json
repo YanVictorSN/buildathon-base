@@ -40,6 +40,6 @@
     "lint-staged": "^13.0.3"
   },
   "resolutions": {
-    "@coinbase/wallet-sdk": "4.0.0-beta.7"
+    "@coinbase/wallet-sdk": "4.0.0"
   }
 }

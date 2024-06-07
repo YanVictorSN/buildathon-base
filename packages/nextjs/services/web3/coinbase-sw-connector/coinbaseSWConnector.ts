@@ -20,7 +20,6 @@ export const coinbaseSdkWallet = (): Wallet => ({
     createConnector(config => ({
       ...coinbaseWagmiWallet({
         appName: "Scaffold-ETH 2",
-        smartWalletOnly: true,
         chainId: baseSepolia.id,
       })(config),
       ...walletDetails,
