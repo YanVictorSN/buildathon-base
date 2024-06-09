@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     QuizGame: {
-      address: "0x68B1D87F95878fE05B998F19b66F4baba5De1aed",
+      address: "0xa82fF9aFd8f496c3d6ac40E2a0F282E47488CFc9",
       abi: [
         {
           inputs: [
@@ -37,7 +37,22 @@ const deployedContracts = {
         },
         {
           inputs: [],
+          name: "MatchIsNotStarted",
+          type: "error",
+        },
+        {
+          inputs: [],
           name: "PlayerAlreadyJoined",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "PlayerAlreadyLoseTheMatch",
+          type: "error",
+        },
+        {
+          inputs: [],
+          name: "PlayerIsNotInMatch",
           type: "error",
         },
         {
@@ -61,7 +76,26 @@ const deployedContracts = {
               type: "uint256",
             },
           ],
-          name: "gameStarted",
+          name: "GameStarted",
+          type: "event",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "matchId",
+              type: "uint256",
+            },
+            {
+              indexed: false,
+              internalType: "uint256",
+              name: "timestamp",
+              type: "uint256",
+            },
+          ],
+          name: "MatchCreated",
           type: "event",
         },
         {
@@ -74,7 +108,7 @@ const deployedContracts = {
               type: "uint256",
             },
           ],
-          name: "newStakeValue",
+          name: "NewStakeValue",
           type: "event",
         },
         {
@@ -93,7 +127,7 @@ const deployedContracts = {
               type: "uint256",
             },
           ],
-          name: "playerJoined",
+          name: "PlayerJoined",
           type: "event",
         },
         {
@@ -112,8 +146,22 @@ const deployedContracts = {
               type: "uint256",
             },
           ],
-          name: "playerUnstaked",
+          name: "PlayerUnstaked",
           type: "event",
+        },
+        {
+          inputs: [],
+          name: "answerIsCorrect",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [],
+          name: "answerIsIncorrect",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
         },
         {
           inputs: [],
@@ -129,8 +177,130 @@ const deployedContracts = {
           type: "function",
         },
         {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "_matchId",
+              type: "uint256",
+            },
+          ],
+          name: "getMatch",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "uint256",
+                  name: "matchId",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "matchTimestamp",
+                  type: "uint256",
+                },
+                {
+                  internalType: "address[]",
+                  name: "players",
+                  type: "address[]",
+                },
+              ],
+              internalType: "struct QuizGame.MatchData",
+              name: "",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "_matchId",
+              type: "uint256",
+            },
+          ],
+          name: "getMatchPlayers",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "",
+              type: "address[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "_player",
+              type: "address",
+            },
+          ],
+          name: "getPlayerData",
+          outputs: [
+            {
+              components: [
+                {
+                  internalType: "address",
+                  name: "playerAddress",
+                  type: "address",
+                },
+                {
+                  internalType: "uint256",
+                  name: "playerBalance",
+                  type: "uint256",
+                },
+                {
+                  components: [
+                    {
+                      internalType: "uint256",
+                      name: "_value",
+                      type: "uint256",
+                    },
+                  ],
+                  internalType: "struct Counters.Counter",
+                  name: "playerScore",
+                  type: "tuple",
+                },
+                {
+                  internalType: "bool",
+                  name: "playerIsOut",
+                  type: "bool",
+                },
+              ],
+              internalType: "struct QuizGame.PlayerData",
+              name: "",
+              type: "tuple",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [],
-          name: "getNumberOfPlayers",
+          name: "getPlayers",
+          outputs: [
+            {
+              internalType: "address[]",
+              name: "",
+              type: "address[]",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          name: "matchIds",
           outputs: [
             {
               internalType: "uint256",
@@ -143,12 +313,12 @@ const deployedContracts = {
         },
         {
           inputs: [],
-          name: "getPlayers",
+          name: "maxMatchs",
           outputs: [
             {
-              internalType: "uint256[]",
+              internalType: "uint256",
               name: "",
-              type: "uint256[]",
+              type: "uint256",
             },
           ],
           stateMutability: "view",
@@ -178,12 +348,25 @@ const deployedContracts = {
           name: "players",
           outputs: [
             {
-              internalType: "uint256",
+              internalType: "address",
               name: "",
-              type: "uint256",
+              type: "address",
             },
           ],
           stateMutability: "view",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "_maxPlayersPerMatch",
+              type: "uint256",
+            },
+          ],
+          name: "setMaxPlayersPerMatch",
+          outputs: [],
+          stateMutability: "nonpayable",
           type: "function",
         },
         {

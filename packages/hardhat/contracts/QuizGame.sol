@@ -11,23 +11,45 @@ import { Counters } from "@openzeppelin/contracts/utils/Counters.sol";
  * @author @YanVictorSN
  */
 contract QuizGame {
-	mapping(address => uint256) playerBalances;
-	uint256[] public players;
+	using Counters for Counters.Counter;
+	struct PlayerData {
+		address playerAddress;
+		uint256 playerBalance;
+		Counters.Counter playerScore;
+		bool playerIsOut;
+	}
+
+	struct MatchData {
+		uint256 matchId;
+		uint256 matchTimestamp;
+		address[] players;
+	}
+
+	mapping(address => PlayerData) playerData;
+	mapping(uint256 => MatchData) matches;
+	uint256[] public matchIds;
+	address[] public players;
 	uint256 public maxPlayersPerMatch;
+	uint256 public maxMatchs;
 	uint256 public stakeValue;
 	bool public gameBegun;
-	using Counters for Counters.Counter;
-	Counters.Counter private numberOfPlayers;
 
-	event playerJoined(address indexed player, uint256 amount);
-	event newStakeValue(uint256 newStakeValue);
-	event playerUnstaked(address indexed player, uint256 amount);
-	event gameStarted(uint256 maxPlayersPerMatch, uint256 timestamp);
+	Counters.Counter private numberOfPlayers;
+	Counters.Counter private numberOfMatches;
+
+	event PlayerJoined(address indexed player, uint256 amount);
+	event NewStakeValue(uint256 newStakeValue);
+	event PlayerUnstaked(address indexed player, uint256 amount);
+	event GameStarted(uint256 maxPlayersPerMatch, uint256 timestamp);
+	event MatchCreated(uint256 matchId, uint256 timestamp);
 
 	error PlayerAlreadyJoined();
 	error InsufficientBalanceToPlay();
 	error GameAlreadyBegun();
 	error TotalPlayerPerMatchReached();
+	error PlayerAlreadyLoseTheMatch();
+	error MatchIsNotStarted();
+	error PlayerIsNotInMatch();
 
 	/// @notice Constructor to set the initial stake value
 	/// @param _stakeValue The amount of Ether required to stake
@@ -43,45 +65,138 @@ contract QuizGame {
 		_;
 	}
 
+	modifier isMatchStarted() {
+		if (!gameBegun) {
+			revert MatchIsNotStarted();
+		}
+		_;
+	}
+
+	modifier isPlayerOut() {
+		if (playerData[msg.sender].playerIsOut) {
+			revert PlayerAlreadyLoseTheMatch();
+		}
+		_;
+	}
+
+	modifier isPlayerInMatch() {
+		if (playerData[msg.sender].playerAddress != msg.sender) {
+			revert PlayerIsNotInMatch();
+		}
+		_;
+	}
+
+	function _createMatch() private {
+		uint256 matchId = numberOfMatches.current();
+		address[] memory matchPlayers = players;
+		matches[matchId] = MatchData({
+			matchId: matchId,
+			matchTimestamp: block.timestamp,
+			players: matchPlayers
+		});
+		numberOfMatches.increment();
+		gameBegun = true;
+		delete players;
+		emit MatchCreated(matchId, block.timestamp);
+	}
+
 	/// @notice Stake Ether to play the game
 	/// @dev Players can only stake once
 	function stakeToPlay() public payable isGameNotBegun {
-		if (playerBalances[msg.sender] > 0) revert PlayerAlreadyJoined();
+		if (playerData[msg.sender].playerBalance > 0)
+			revert PlayerAlreadyJoined();
 		if (msg.value < stakeValue) revert InsufficientBalanceToPlay();
 		numberOfPlayers.increment();
-		if (numberOfPlayers.current() == maxPlayersPerMatch) {
-			gameBegun = true;
-			emit gameStarted(maxPlayersPerMatch, block.timestamp);
+
+		playerData[msg.sender] = PlayerData({
+			playerAddress: msg.sender,
+			playerBalance: msg.value,
+			playerScore: Counters.Counter(0),
+			playerIsOut: false
+		});
+
+		players.push(msg.sender);
+		numberOfPlayers.increment();
+		if (players.length == maxPlayersPerMatch) {
+			_createMatch();
 		}
-		playerBalances[msg.sender] += msg.value;
-		emit playerJoined(msg.sender, msg.value);
+		emit PlayerJoined(msg.sender, msg.value);
 	}
 
 	/// @notice Unstake Ether before the game starts
 	/// @dev Players can only unstake if they have staked
 	function unStake() public isGameNotBegun {
-		if (playerBalances[msg.sender] < stakeValue)
+		if (playerData[msg.sender].playerBalance < stakeValue)
 			revert PlayerAlreadyJoined();
+		uint256 balance = playerData[msg.sender].playerBalance;
+		playerData[msg.sender].playerBalance = 0;
 		numberOfPlayers.decrement();
-		playerBalances[msg.sender] = 0;
-		payable(msg.sender).transfer(stakeValue);
-		emit playerUnstaked(msg.sender, stakeValue);
+		uint256 currentMatchId = numberOfMatches.current() - 1;
+
+		address[] storage matchPlayers = matches[currentMatchId].players;
+		for (uint256 i = 0; i < matchPlayers.length; i++) {
+			if (matchPlayers[i] == msg.sender) {
+				matchPlayers[i] = matchPlayers[matchPlayers.length - 1];
+				matchPlayers.pop();
+				break;
+			}
+		}
+
+		payable(msg.sender).transfer(balance);
+		emit PlayerUnstaked(msg.sender, stakeValue);
 	}
 
 	/// @notice Set the stake value required to play the game
 	/// @param _newStakeValue The new stake value
 	function setStakeValue(uint256 _newStakeValue) public {
 		stakeValue = _newStakeValue;
-		emit newStakeValue(_newStakeValue);
+		emit NewStakeValue(_newStakeValue);
+	}
+
+	/// @notice Increase the player score for a correct answer
+	function answerIsCorrect()
+		public
+		isPlayerOut
+		isMatchStarted
+		isPlayerInMatch
+	{
+		playerData[msg.sender].playerScore.increment();
+	}
+
+	/// @notice Set the player as out for an incorrect answer
+	function answerIsIncorrect()
+		public
+		isPlayerOut
+		isMatchStarted
+		isPlayerInMatch
+	{
+		playerData[msg.sender].playerIsOut = true;
+		playerData[msg.sender].playerBalance = 0;
+	}
+
+	/// @notice Set the maximum number of players per match
+	function setMaxPlayersPerMatch(uint256 _maxPlayersPerMatch) public {
+		maxPlayersPerMatch = _maxPlayersPerMatch;
 	}
 
 	/// @notice Get the players in this match
-	function getPlayers() public view returns (uint256[] memory) {
+	function getPlayers() public view returns (address[] memory) {
 		return players;
 	}
 
-	/// @notice Get the number of players in this match
-	function getNumberOfPlayers() public view returns (uint256) {
-		return numberOfPlayers.current();
+	function getMatchPlayers(
+		uint256 _matchId
+	) public view returns (address[] memory) {
+		return matches[_matchId].players;
+	}
+
+	function getMatch(uint256 _matchId) public view returns (MatchData memory) {
+		return matches[_matchId];
+	}
+
+	function getPlayerData(
+		address _player
+	) public view returns (PlayerData memory) {
+		return playerData[_player];
 	}
 }
