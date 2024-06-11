@@ -15,7 +15,9 @@ contract QuizGame {
 	struct PlayerData {
 		address playerAddress;
 		uint256 playerBalance;
-		Counters.Counter playerScore;
+		uint256 playerMatchTime;
+		uint256 playerScore;
+		uint256 playerLevel;
 		bool playerIsOut;
 	}
 
@@ -30,7 +32,7 @@ contract QuizGame {
 	uint256[] public matchIds;
 	address[] public players;
 	uint256 public maxPlayersPerMatch;
-	uint256 public maxMatchs;
+	uint256 public maxLevels;
 	uint256 public stakeValue;
 	bool public gameBegun;
 
@@ -42,6 +44,7 @@ contract QuizGame {
 	event PlayerUnstaked(address indexed player, uint256 amount);
 	event GameStarted(uint256 maxPlayersPerMatch, uint256 timestamp);
 	event MatchCreated(uint256 matchId, uint256 timestamp);
+	event GameIsOver(address indexed winner);
 
 	error PlayerAlreadyJoined();
 	error InsufficientBalanceToPlay();
@@ -50,12 +53,18 @@ contract QuizGame {
 	error PlayerAlreadyLoseTheMatch();
 	error MatchIsNotStarted();
 	error PlayerIsNotInMatch();
+	error PlayerDidNotAnswerInTime();
 
 	/// @notice Constructor to set the initial stake value
 	/// @param _stakeValue The amount of Ether required to stake
-	constructor(uint256 _stakeValue, uint256 _maxPlayersPerMatch) {
+	constructor(
+		uint256 _stakeValue,
+		uint256 _maxPlayersPerMatch,
+		uint256 _maxLevels
+	) {
 		stakeValue = _stakeValue;
 		maxPlayersPerMatch = _maxPlayersPerMatch;
+		maxLevels = _maxLevels;
 	}
 
 	modifier isGameNotBegun() {
@@ -86,18 +95,36 @@ contract QuizGame {
 		_;
 	}
 
+	modifier isAnswerInTime() {
+		if (
+			playerData[msg.sender].playerMatchTime + 5 seconds < block.timestamp
+		) {
+			revert PlayerDidNotAnswerInTime();
+		}
+		_;
+	}
+
 	function _createMatch() private {
 		uint256 matchId = numberOfMatches.current();
 		address[] memory matchPlayers = players;
 		matches[matchId] = MatchData({
 			matchId: matchId,
-			matchTimestamp: block.timestamp,
+			matchTimestamp: 0,
 			players: matchPlayers
 		});
-		numberOfMatches.increment();
 		gameBegun = true;
-		delete players;
+		setThePlayersTime(matchId);
 		emit MatchCreated(matchId, block.timestamp);
+	}
+
+	function setThePlayersTime(uint256 _matchIdTime) public {
+		for (uint i = 0; i < players.length; i++) {
+			playerData[players[i]].playerMatchTime =
+				block.timestamp +
+				10 seconds;
+		}
+		matches[_matchIdTime].matchTimestamp = block.timestamp + 10 seconds;
+		delete players;
 	}
 
 	/// @notice Stake Ether to play the game
@@ -106,12 +133,13 @@ contract QuizGame {
 		if (playerData[msg.sender].playerBalance > 0)
 			revert PlayerAlreadyJoined();
 		if (msg.value < stakeValue) revert InsufficientBalanceToPlay();
-		numberOfPlayers.increment();
 
 		playerData[msg.sender] = PlayerData({
 			playerAddress: msg.sender,
 			playerBalance: msg.value,
-			playerScore: Counters.Counter(0),
+			playerMatchTime: 0,
+			playerScore: 0,
+			playerLevel: 0,
 			playerIsOut: false
 		});
 
@@ -154,24 +182,35 @@ contract QuizGame {
 	}
 
 	/// @notice Increase the player score for a correct answer
-	function answerIsCorrect()
-		public
-		isPlayerOut
-		isMatchStarted
-		isPlayerInMatch
-	{
-		playerData[msg.sender].playerScore.increment();
+	function checkAnswer(
+		bool _isCorrect
+	) public isPlayerOut isMatchStarted isPlayerInMatch isAnswerInTime {
+		if (_isCorrect) {
+			answerIsValid();
+		} else {
+			answerIsNotValid();
+		}
+	}
+
+	function answerIsValid() private {
+		playerData[msg.sender].playerScore++;
+		playerData[msg.sender].playerLevel++;
+		playerData[msg.sender].playerMatchTime = block.timestamp + 5 seconds;
+		if (playerData[msg.sender].playerLevel >= maxLevels) {
+			endMatch(msg.sender);
+		}
 	}
 
 	/// @notice Set the player as out for an incorrect answer
-	function answerIsIncorrect()
-		public
-		isPlayerOut
-		isMatchStarted
-		isPlayerInMatch
-	{
+	function answerIsNotValid() private {
 		playerData[msg.sender].playerIsOut = true;
 		playerData[msg.sender].playerBalance = 0;
+	}
+
+	function endMatch(address _winnerAddress) private {
+		payable(_winnerAddress).transfer(address(this).balance);
+		gameBegun = false;
+		emit GameIsOver(_winnerAddress);
 	}
 
 	/// @notice Set the maximum number of players per match
