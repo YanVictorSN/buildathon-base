@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     QuizGame: {
-      address: "0xa82fF9aFd8f496c3d6ac40E2a0F282E47488CFc9",
+      address: "0xFD471836031dc5108809D173A067e8486B9047A3",
       abi: [
         {
           inputs: [
@@ -19,6 +19,11 @@ const deployedContracts = {
             {
               internalType: "uint256",
               name: "_maxPlayersPerMatch",
+              type: "uint256",
+            },
+            {
+              internalType: "uint256",
+              name: "_maxLevels",
               type: "uint256",
             },
           ],
@@ -52,6 +57,11 @@ const deployedContracts = {
         },
         {
           inputs: [],
+          name: "PlayerDidNotAnswerInTime",
+          type: "error",
+        },
+        {
+          inputs: [],
           name: "PlayerIsNotInMatch",
           type: "error",
         },
@@ -59,6 +69,19 @@ const deployedContracts = {
           inputs: [],
           name: "TotalPlayerPerMatchReached",
           type: "error",
+        },
+        {
+          anonymous: false,
+          inputs: [
+            {
+              indexed: true,
+              internalType: "address",
+              name: "winner",
+              type: "address",
+            },
+          ],
+          name: "GameIsOver",
+          type: "event",
         },
         {
           anonymous: false,
@@ -150,15 +173,14 @@ const deployedContracts = {
           type: "event",
         },
         {
-          inputs: [],
-          name: "answerIsCorrect",
-          outputs: [],
-          stateMutability: "nonpayable",
-          type: "function",
-        },
-        {
-          inputs: [],
-          name: "answerIsIncorrect",
+          inputs: [
+            {
+              internalType: "bool",
+              name: "_isCorrect",
+              type: "bool",
+            },
+          ],
+          name: "checkAnswer",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
@@ -254,16 +276,19 @@ const deployedContracts = {
                   type: "uint256",
                 },
                 {
-                  components: [
-                    {
-                      internalType: "uint256",
-                      name: "_value",
-                      type: "uint256",
-                    },
-                  ],
-                  internalType: "struct Counters.Counter",
+                  internalType: "uint256",
+                  name: "playerMatchTime",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
                   name: "playerScore",
-                  type: "tuple",
+                  type: "uint256",
+                },
+                {
+                  internalType: "uint256",
+                  name: "playerLevel",
+                  type: "uint256",
                 },
                 {
                   internalType: "bool",
@@ -313,7 +338,7 @@ const deployedContracts = {
         },
         {
           inputs: [],
-          name: "maxMatchs",
+          name: "maxLevels",
           outputs: [
             {
               internalType: "uint256",
@@ -378,6 +403,19 @@ const deployedContracts = {
             },
           ],
           name: "setStakeValue",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+        {
+          inputs: [
+            {
+              internalType: "uint256",
+              name: "_matchIdTime",
+              type: "uint256",
+            },
+          ],
+          name: "setThePlayersTime",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
